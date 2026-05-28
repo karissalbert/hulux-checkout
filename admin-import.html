@@ -53,7 +53,7 @@
     <textarea id="data" placeholder="username  password  expire  email&#10;6f73b3b4bc  cedc00cc0b  2026-06-28  karissalbert@gmail.com&#10;e56ba719a87f  1971648f01  2026-06-20  info@a1pianoremovals.com"></textarea>
     <p class="hint">
       Format per line: <code>username  password  expire  email</code> (same order as your panel)<br>
-      Separators can be spaces, comma, tab, or semicolon. Expire is <code>YYYY-MM-DD</code> (optional).<br>
+      Separators: single space, tab, comma, or semicolon — all work. Expire is <code>YYYY-MM-DD</code> (optional).<br>
       Rows without an email are skipped (they can't be matched on renewal).<br>
       A header line containing <code>username</code> is detected and ignored.
     </p>
@@ -78,8 +78,8 @@ function parseData(text){
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const out = [];
   for (let i = 0; i < lines.length; i++){
-    // split on comma, tab, semicolon, OR runs of 2+ spaces
-    const parts = lines[i].split(/[,;\t]+|\s{2,}/).map(s => s.trim()).filter(Boolean);
+    // split on comma, semicolon, or ANY whitespace (single spaces, tabs, etc.)
+    const parts = lines[i].split(/[,;]+|\s+/).map(s => s.trim()).filter(Boolean);
     // expected order (matches your panel/PDF): username, password, expire, email
     const username = parts[0] || '';
     const password = parts[1] || '';
