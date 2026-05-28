@@ -32,7 +32,10 @@ const {
   PANEL_API_BASE,        // e.g. https://8k.cms-only.ru/api/api.php
   PANEL_API_KEY,         // your panel api_key
   PANEL_PACK = '35338',  // package id (same for all plans)
-  PANEL_SERVER_URL,      // e.g. http://your-server.com:8080  (used to build M3U + server URL)
+  PANEL_SERVER_URL,                       // main server (fallback / used for renewals)
+  SERVER_URL_MAIN,                        // main server hostname
+  SERVER_URL_VPN,                         // server for VPN users
+  SERVER_URL_SMARTERS,                    // server for Smarters Pro users
   BREVO_API_KEY,                          // Brevo (Sendinblue) API key
   BREVO_SENDER_EMAIL,                     // your verified Brevo sender email
   BREVO_SENDER_NAME = 'Support',          // sender display name
@@ -204,6 +207,26 @@ async function panelRenew(username, password, months) {
   return { ok, raw: text };
 }
 
+/* Build the 3 server/M3U links (main, VPN, Smarters) from credentials.
+   Falls back to PANEL_SERVER_URL for the main one if SERVER_URL_MAIN isn't set.
+   Works for new AND renewal customers. */
+function buildServers(username, password) {
+  const mk = (label, base) => {
+    base = (base || '').replace(/\/+$/, '');
+    if (!base || !username || !password) return null;
+    return {
+      label,
+      server: base,
+      m3u: `${base}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`
+    };
+  };
+  return [
+    mk('Main', SERVER_URL_MAIN || PANEL_SERVER_URL),
+    mk('VPN', SERVER_URL_VPN),
+    mk('Smarters Pro', SERVER_URL_SMARTERS)
+  ].filter(Boolean);
+}
+
 /* Build the server URL + M3U URL from PANEL_SERVER_URL + credentials.
    Works for new AND renewal customers (uses their username/password). */
 function buildUrls(username, password) {
@@ -237,16 +260,19 @@ async function sendTelegram(text) {
 }
 
 /* ---- BREVO EMAIL ---- */
-async function sendCustomerEmail({ to, name, planName, username, password, expire, m3uUrl, serverUrl }) {
+async function sendCustomerEmail({ to, name, planName, username, password, expire, servers = [] }) {
   if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) { console.warn('Brevo not configured — skipping email'); return false; }
   if (!to) { console.warn('No customer email — skipping email'); return false; }
 
-  const serverBlock = serverUrl
-    ? `<tr><td style="padding:8px 0 8px 14px;color:#6b7280">Server URL</td><td style="padding:8px 14px 8px 0;font-family:monospace;color:#111;word-break:break-all">${serverUrl}</td></tr>`
-    : '';
-  const m3uBlock = m3uUrl
-    ? `<tr><td style="padding:8px 0 8px 14px;color:#6b7280">M3U URL</td><td style="padding:8px 14px 8px 0;font-family:monospace;color:#111;word-break:break-all"><a href="${m3uUrl}" style="color:#16a34a">${m3uUrl}</a></td></tr>`
-    : '';
+  // build a block for each server (Main / VPN / Smarters Pro)
+  const serverSections = servers.map(s => `
+    <div style="margin:14px 0;padding:14px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
+      <div style="font-weight:700;color:#15803d;margin-bottom:8px">${s.label}</div>
+      <div style="font-size:13px;color:#6b7280">Server URL</div>
+      <div style="font-family:monospace;color:#111;word-break:break-all;margin-bottom:8px">${s.server}</div>
+      <div style="font-size:13px;color:#6b7280">M3U URL</div>
+      <div style="font-family:monospace;word-break:break-all"><a href="${s.m3u}" style="color:#16a34a">${s.m3u}</a></div>
+    </div>`).join('');
 
   const html = `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
@@ -260,9 +286,8 @@ async function sendCustomerEmail({ to, name, planName, username, password, expir
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Username</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${username || '—'}</td></tr>
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Password</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${password || '—'}</td></tr>
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Expires</td><td style="padding:8px 14px 8px 0;color:#111">${expire || '—'}</td></tr>
-        ${serverBlock}
-        ${m3uBlock}
       </table>
+      ${serverSections ? `<p style="font-size:14px;color:#374151;font-weight:600;margin:18px 0 4px">Your connection links:</p>${serverSections}` : ''}
       <div style="text-align:center;margin:26px 0">
         <a href="${SETUP_GUIDE_URL}" style="display:inline-block;background:#22c55e;color:#000;font-weight:700;text-decoration:none;padding:13px 26px;border-radius:10px">📘 View the Setup Guide</a>
       </div>
@@ -369,6 +394,9 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         console.error('Provisioning error:', err);
       }
 
+      // Build the 3 server/M3U links (main, VPN, Smarters) from the credentials
+      const servers = panelOk ? buildServers(creds.username, creds.password) : [];
+
       // Telegram
       const tag = isRenewal ? '🔄 <b>RENEWAL — line extended</b>' : '🆕 <b>NEW customer — line created</b>';
       const lines = [
@@ -378,9 +406,13 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         '🔐 <b>Credentials</b>',
         `  • Username: <code>${creds.username || '—'}</code>`,
         `  • Password: <code>${creds.password || '—'}</code>`,
-        serverUrl ? `  • Server: <code>${serverUrl}</code>` : null,
-        m3uUrl ? `  • M3U: <code>${m3uUrl}</code>` : null,
         newExpire ? (isRenewal ? `  • Expire: ${oldExpire} → <b>${newExpire}</b>` : `  • Expire: <b>${newExpire}</b>`) : null,
+        ...(servers.length ? ['', '🌐 <b>Server / M3U links</b>'] : []),
+        ...servers.flatMap(s => [
+          `<b>${s.label}</b>`,
+          `  • Server: <code>${s.server}</code>`,
+          `  • M3U: <code>${s.m3u}</code>`
+        ]),
         '',
         '👤 <b>Customer</b>',
         `  • Name: ${name}`,
@@ -398,13 +430,13 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         emailed = await sendCustomerEmail({
           to: email, name, planName,
           username: creds.username, password: creds.password,
-          expire: newExpire, m3uUrl, serverUrl
+          expire: newExpire, servers
         });
       }
 
       // hand the credentials back to the page (only if panel succeeded)
       data._provision = panelOk
-        ? { ok:true, isRenewal, username:creds.username, password:creds.password, expire:newExpire, m3u:m3uUrl, server:serverUrl, emailed }
+        ? { ok:true, isRenewal, username:creds.username, password:creds.password, expire:newExpire, servers, emailed }
         : { ok:false };
     }
     res.status(r.status).json(data);
@@ -464,10 +496,12 @@ app.get('/api/test-telegram', async (req, res) => {
 app.get('/api/diag', (req, res) => {
   if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.status(403).json({ error:'Forbidden' });
   res.json({
+    version: 'v5-url-parse',
     paypal:   { clientId: !!PAYPAL_CLIENT_ID, secret: !!PAYPAL_SECRET, env: PAYPAL_ENV },
     telegram: { token: !!TELEGRAM_BOT_TOKEN, chatId: !!TELEGRAM_CHAT_ID },
     database: !!DATABASE_URL,
-    panel:    { base: PANEL_API_BASE || null, key: !!PANEL_API_KEY, pack: PANEL_PACK },
+    panel:    { base: PANEL_API_BASE || null, key: !!PANEL_API_KEY, pack: PANEL_PACK, serverUrl: PANEL_SERVER_URL || null },
+    servers:  { main: SERVER_URL_MAIN || PANEL_SERVER_URL || null, vpn: SERVER_URL_VPN || null, smarters: SERVER_URL_SMARTERS || null },
     brevo:    { key: !!BREVO_API_KEY, sender: BREVO_SENDER_EMAIL || null },
     setupUrl: SETUP_GUIDE_URL
   });
