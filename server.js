@@ -139,33 +139,51 @@ async function panelNew(months, notes) {
             + `&country=ALL&notes=${encodeURIComponent(notes)}&api_key=${PANEL_API_KEY}`;
   const res = await fetch(url);
   const text = await res.text();
-  let username = '', password = '', m3u = '', server = '', raw = text;
+  let username = '', password = '', m3u = '', server = '', userId = '', ok = false, raw = text;
+
   try {
     const j = JSON.parse(text);
-    username = j.username || j.user || (j.data && j.data.username) || '';
-    password = j.password || j.pass || (j.data && j.data.password) || '';
-    // common field names panels use for the playlist / server URL — tune to your panel
-    m3u    = j.m3u || j.m3u_url || j.url || j.playlist || (j.data && (j.data.m3u || j.data.url)) || '';
-    server = j.server || j.host || j.dns || j.server_url || (j.data && (j.data.server || j.data.host)) || '';
     raw = j;
+    // panel returns: { status:"true", user_id, message:"Add M3U successful", url:"http://server/get.php?username=..&password=..&..." }
+    ok = String(j.status).toLowerCase() === 'true';
+    userId = j.user_id || '';
+    m3u = j.url || j.m3u || '';
+    if (m3u) {
+      // pull username + password out of the m3u url
+      try {
+        const u = new URL(m3u);
+        username = u.searchParams.get('username') || '';
+        password = u.searchParams.get('password') || '';
+        server = `${u.protocol}//${u.host}`;          // e.g. http://acre15488.cdngold.me
+      } catch {
+        // fallback regex if URL parsing fails
+        const um = m3u.match(/username=([^&]+)/i);
+        const pm = m3u.match(/password=([^&]+)/i);
+        const sm = m3u.match(/^(https?:\/\/[^/]+)/i);
+        if (um) username = decodeURIComponent(um[1]);
+        if (pm) password = decodeURIComponent(pm[1]);
+        if (sm) server = sm[1];
+      }
+    }
   } catch {
-    const u = text.match(/user(?:name)?["':=\s]+([A-Za-z0-9]+)/i);
-    const p = text.match(/pass(?:word)?["':=\s]+([A-Za-z0-9]+)/i);
+    // not JSON — try to find an m3u url in the text
     const m = text.match(/(https?:\/\/[^\s"']+get\.php[^\s"']*)/i);
-    if (u) username = u[1];
-    if (p) password = p[1];
-    if (m) m3u = m[1];
+    if (m) {
+      m3u = m[1];
+      const um = m3u.match(/username=([^&]+)/i);
+      const pm = m3u.match(/password=([^&]+)/i);
+      const sm = m3u.match(/^(https?:\/\/[^/]+)/i);
+      if (um) username = decodeURIComponent(um[1]);
+      if (pm) password = decodeURIComponent(pm[1]);
+      if (sm) server = sm[1];
+      ok = !!(username && password);
+    }
   }
-  // if no full m3u given but we have a server + creds, build the standard XUI m3u link
-  if (!m3u && server && username && password) {
-    const base = server.replace(/\/+$/, '');
-    m3u = `${base}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
-  }
-  // DEBUG — logs the complete raw panel response so we can see the exact format
+
   console.log('=== PANEL action=new RAW RESPONSE ===');
   console.log(text);
   console.log('=== END PANEL RESPONSE ===');
-  return { username, password, m3u, server, raw };
+  return { username, password, m3u, server, userId, ok, raw };
 }
 
 async function panelRenew(username, password, months) {
@@ -174,7 +192,15 @@ async function panelRenew(username, password, months) {
   const res = await fetch(url);
   const text = await res.text();
   let ok = res.ok;
-  try { const j = JSON.parse(text); if (j.status === false || j.error) ok = false; } catch {}
+  try {
+    const j = JSON.parse(text);
+    // panel returns status:"true" on success (string), or an error message otherwise
+    if ('status' in j) ok = String(j.status).toLowerCase() === 'true';
+    if (j.error) ok = false;
+  } catch { /* keep http-level ok */ }
+  console.log('=== PANEL action=renew RAW RESPONSE ===');
+  console.log(text);
+  console.log('=== END PANEL RESPONSE ===');
   return { ok, raw: text };
 }
 
@@ -332,11 +358,10 @@ app.post('/api/orders/:id/capture', async (req, res) => {
           const nw = await panelNew(months, notes);
           creds = { username: nw.username, password: nw.password };
           panelRaw = typeof nw.raw === 'string' ? nw.raw : JSON.stringify(nw.raw);
-          panelOk = !!(creds.username && creds.password);
-          // prefer the panel-provided m3u; otherwise build from configured server
-          const built = buildUrls(creds.username, creds.password);
-          serverUrl = nw.server || built.server;
-          m3uUrl = nw.m3u || built.m3u;
+          // success is the panel's status flag AND having extracted credentials
+          panelOk = nw.ok && !!(creds.username && creds.password);
+          serverUrl = nw.server || '';
+          m3uUrl = nw.m3u || '';
           if (panelOk) newExpire = await upsertNew(email, creds.username, creds.password, months, data.id, m3uUrl);
         }
       } catch (err) {
