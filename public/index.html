@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>document.documentElement.className += ' js';</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Checkout — Secure Payment</title>
+<meta name="description" content="Complete your order securely." />
+<meta name="robots" content="noindex, follow" />
+<meta name="theme-color" content="#D80621" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<style>
+:root{
+--c-bg:#FFFFFF;--c-bg-2:#FAFAFB;--c-bg-3:#F4F4F7;--c-surface:#FFFFFF;
+--c-border:#E8E8EC;--c-border-strong:#D1D1D8;
+--c-text:#0A0A14;--c-text-2:#525266;--c-text-3:#868696;
+--c-accent:#D80621;--c-accent-2:#EF3340;--c-accent-3:#B00418;
+--c-success:#10B981;--c-error:#EF4444;
+--grad-brand:linear-gradient(135deg,#D80621 0%,#EF3340 55%,#B00418 100%);
+--grad-soft:linear-gradient(135deg,rgba(216,6,33,0.08) 0%,rgba(239,51,64,0.05) 100%);
+--grad-text-accent:linear-gradient(135deg,#D80621 0%,#EF3340 100%);
+--shadow-sm:0 2px 4px rgba(10,10,20,0.04);--shadow-md:0 8px 24px rgba(10,10,20,0.06);
+--ease:cubic-bezier(0.4,0,0.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;line-height:1.6;color:var(--c-text);background:var(--c-bg);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none;transition:color 150ms var(--ease)}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit}
+.serif{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400}
+.container{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* Header */
+.site-header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.95);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--c-border)}
+.header-inner{display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:11px;font-weight:700;font-size:18px;letter-spacing:-0.02em}
+.logo-mark{position:relative;width:34px;height:34px;background:var(--c-text);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;box-shadow:0 4px 12px rgba(10,10,20,0.25)}
+.logo-mark::after{content:'';position:absolute;bottom:6px;left:8px;right:8px;height:2.5px;border-radius:2px;background:var(--grad-brand)}
+.header-secure{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:var(--c-text-2)}
+.header-secure i{color:var(--c-success)}
+
+.checkout-wrap{flex:1;padding:40px 0 64px}
+.checkout-head{text-align:center;max-width:680px;margin:0 auto 36px}
+.checkout-head .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-accent);margin-bottom:14px}
+.checkout-head h1{font-size:clamp(28px,4vw,42px);line-height:1.05;font-weight:700;letter-spacing:-0.035em}
+.checkout-head h1 .grad{background:var(--grad-text-accent);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.checkout-head p{font-size:16px;color:var(--c-text-2);margin-top:12px}
+
+.checkout-grid{display:grid;grid-template-columns:1fr 400px;gap:24px;align-items:start;max-width:1040px;margin:0 auto}
+
+.co-card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:18px;padding:28px;box-shadow:var(--shadow-sm)}
+.co-card + .co-card{margin-top:18px}
+.co-card-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.co-step-num{width:32px;height:32px;border-radius:10px;background:var(--grad-brand);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700;box-shadow:0 6px 16px rgba(216,6,33,0.3)}
+.co-card-head h2{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+
+.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.field label{font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-text-2)}
+.field input,.field select{background:var(--c-bg-2);border:1.5px solid var(--c-border);color:var(--c-text);padding:12px 14px;border-radius:11px;font-size:15px;transition:all 200ms var(--ease)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--c-accent);background:var(--c-surface);box-shadow:0 0 0 3px rgba(216,6,33,0.12)}
+.field input.invalid,.field select.invalid{border-color:var(--c-error);background:#fff5f5}
+.field input.invalid:focus{box-shadow:0 0 0 3px rgba(239,68,68,0.18)}
+.form-error{display:none;background:#fef2f2;border:1.5px solid var(--c-error);color:#991B1B;border-radius:11px;padding:12px 16px;font-size:13.5px;font-weight:500;margin-bottom:14px}
+.field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23868696' d='M6 8.5L1.5 4h9z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px;cursor:pointer}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* plan options */
+.plan-options{display:flex;flex-direction:column;gap:10px}
+.plan-opt{display:flex;align-items:center;gap:13px;padding:14px 16px;border:1.5px solid var(--c-border);border-radius:12px;cursor:pointer;transition:all 200ms var(--ease);position:relative}
+.plan-opt:hover{border-color:var(--c-border-strong)}
+.plan-opt.active{border-color:var(--c-accent);background:var(--grad-soft);box-shadow:0 8px 20px rgba(216,6,33,0.08)}
+.plan-opt .radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--c-border);flex-shrink:0;display:grid;place-items:center;transition:all 200ms}
+.plan-opt.active .radio{border-color:var(--c-accent)}
+.plan-opt.active .radio::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--grad-brand)}
+.plan-opt .po-info{flex:1}
+.plan-opt .po-name{font-size:14px;font-weight:700}
+.plan-opt .po-desc{font-size:12px;color:var(--c-text-3);margin-top:2px}
+.plan-opt .po-price{text-align:right;flex-shrink:0}
+.plan-opt .po-price strong{font-size:18px;font-weight:800}
+.plan-opt .po-price small{display:block;font-size:11px;color:var(--c-text-3)}
+.plan-opt .po-badge{position:absolute;top:-8px;right:14px;background:var(--grad-brand);color:#fff;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;box-shadow:0 4px 10px rgba(216,6,33,0.3)}
+
+/* summary */
+.summary{position:sticky;top:88px}
+.sum-title{font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-text-2);margin-bottom:18px}
+.sum-product{display:flex;gap:14px;align-items:center;padding-bottom:16px;border-bottom:1px solid var(--c-border);margin-bottom:16px}
+.sum-product .thumb{width:60px;height:60px;border-radius:10px;object-fit:cover;border:1px solid var(--c-border);background:var(--c-bg-3)}
+.sum-product h3{font-size:14px;font-weight:700;letter-spacing:-0.01em}
+.sum-product p{font-size:12px;color:var(--c-text-3);margin-top:2px}
+.sum-line{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px;color:var(--c-text-2)}
+.sum-line .v{font-weight:600;color:var(--c-text)}
+.sum-promo{display:flex;gap:8px;margin:14px 0 6px}
+.sum-promo input{flex:1;background:var(--c-bg-2);border:1.5px solid var(--c-border);border-radius:9px;padding:10px 12px;font-size:13px}
+.sum-promo input:focus{outline:none;border-color:var(--c-accent)}
+.sum-promo button{padding:10px 16px;border-radius:9px;background:var(--c-text);color:#fff;font-weight:600;font-size:12px;transition:all 200ms}
+.sum-promo button:hover{background:var(--c-accent)}
+.promo-msg{font-size:12px;min-height:1em;margin-bottom:4px}
+.promo-msg.ok{color:var(--c-success)}.promo-msg.err{color:var(--c-error)}
+.sum-total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--c-border);margin-top:8px;padding-top:14px}
+.sum-total .lbl{font-size:15px;font-weight:700}
+.sum-total .amt{font-size:28px;font-weight:800;letter-spacing:-0.03em;background:var(--grad-text-accent);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+.pay-head{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-text-3);margin:20px 0 12px;text-align:center;position:relative}
+.pay-head::before,.pay-head::after{content:'';position:absolute;top:50%;width:24%;height:1px;background:var(--c-border)}
+.pay-head::before{left:0}.pay-head::after{right:0}
+#paypal-button-container{min-height:46px}
+.pay-loading{font-size:12px;color:var(--c-text-3);text-align:center;padding:8px}
+.sum-trust{display:flex;flex-direction:column;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--c-border)}
+.sum-trust span{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--c-text-2)}
+.sum-trust i{color:var(--c-success);width:14px;text-align:center}
+
+/* SUCCESS */
+.done{display:none;position:fixed;inset:0;z-index:999;background:rgba(255,255,255,0.97);backdrop-filter:blur(8px);align-items:center;justify-content:center;text-align:center;padding:24px}
+.done.show{display:flex}
+.done .inner{max-width:440px}
+.done .check{width:84px;height:84px;border-radius:50%;background:var(--c-success);color:#fff;font-size:36px;display:grid;place-items:center;margin:0 auto 22px;box-shadow:0 16px 40px rgba(16,185,129,0.35)}
+.done h2{font-size:28px;font-weight:800;letter-spacing:-0.03em;margin-bottom:10px}
+.done p{color:var(--c-text-2);font-size:15px;margin-bottom:16px;line-height:1.55}
+.done .oid{font-family:'JetBrains Mono',monospace;background:var(--c-bg-3);border:1px solid var(--c-border);padding:9px 14px;border-radius:9px;display:inline-block;font-size:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 22px;font-size:14px;font-weight:600;border-radius:11px;background:var(--grad-brand);color:#fff;box-shadow:0 10px 28px rgba(216,6,33,0.35);margin-top:22px;transition:all 280ms var(--ease)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(216,6,33,0.5)}
+
+.footer-light{padding:32px 0 24px;background:var(--c-bg-2);border-top:1px solid var(--c-border)}
+.footer-light-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--c-text-3)}
+
+@media(max-width:900px){
+  .checkout-grid{grid-template-columns:1fr;gap:18px}
+  .summary{position:static;order:-1}
+}
+@media(max-width:520px){
+  .row2{grid-template-columns:1fr}
+  .co-card{padding:22px 18px}
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="logo" href="#"><span class="logo-mark">✦</span>Checkout</a>
+    <div class="header-secure"><i class="fa-solid fa-lock"></i> Secure Checkout</div>
+  </div>
+</header>
+
+<main class="checkout-wrap">
+  <div class="container">
+    <div class="checkout-head">
+      <span class="eyebrow"><i class="fa-solid fa-bolt"></i> Fast · Secure · 30-day money-back</span>
+      <h1>Complete your <span class="grad">order</span></h1>
+      <p>You're seconds away from getting started. Choose your plan and pay securely.</p>
+    </div>
+
+    <div class="checkout-grid">
+
+      <!-- LEFT -->
+      <div>
+        <div class="co-card">
+          <div class="co-card-head"><span class="co-step-num">1</span><h2>Choose your plan</h2></div>
+          <div class="plan-options" id="planOptions">
+            <div class="plan-opt" data-id="starter">
+              <span class="radio"></span>
+              <div class="po-info"><div class="po-name">Plan A — 1 Month</div><div class="po-desc">Try it out, zero commitment</div></div>
+              <div class="po-price"><strong>$17</strong><small>$17.00/mo</small></div>
+            </div>
+            <div class="plan-opt" data-id="quarterly">
+              <span class="po-badge">Save 39%</span>
+              <span class="radio"></span>
+              <div class="po-info"><div class="po-name">Plan B — 3 Months</div><div class="po-desc">Billed every 3 months</div></div>
+              <div class="po-price"><strong>$31</strong><small>$10.33/mo</small></div>
+            </div>
+            <div class="plan-opt active" data-id="premium">
+              <span class="po-badge"><i class="fa-solid fa-crown"></i> Popular</span>
+              <span class="radio"></span>
+              <div class="po-info"><div class="po-name">Plan C — 6 Months</div><div class="po-desc">Best value, billed every 6 months</div></div>
+              <div class="po-price"><strong>$45</strong><small>$7.50/mo</small></div>
+            </div>
+            <div class="plan-opt" data-id="ultra">
+              <span class="po-badge">Save 69%</span>
+              <span class="radio"></span>
+              <div class="po-info"><div class="po-name">Plan D — 12 Months</div><div class="po-desc">Billed annually</div></div>
+              <div class="po-price"><strong>$64</strong><small>$5.33/mo</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="co-card">
+          <div class="co-card-head"><span class="co-step-num">2</span><h2>Your details</h2></div>
+          <div class="form-error" id="formError"></div>
+          <div class="field"><label for="email">Email address</label><input id="email" type="email" placeholder="you@example.com" required /></div>
+          <div class="row2">
+            <div class="field"><label for="fname">First name</label><input id="fname" type="text" placeholder="Jane" /></div>
+            <div class="field"><label for="lname">Last name</label><input id="lname" type="text" placeholder="Doe" /></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="country">Country</label>
+              <select id="country"><option>United States</option><option>United Kingdom</option><option>Canada</option><option>France</option><option>Germany</option><option>Spain</option><option>Other</option></select>
+            </div>
+            <div class="field"><label for="city">City</label><input id="city" type="text" placeholder="Your city" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <aside class="summary">
+        <div class="co-card">
+          <div class="sum-title">Order Summary</div>
+          <div class="sum-product">
+            <div class="thumb"></div>
+            <div>
+              <h3 id="sumName">Plan C — 6 Months</h3>
+              <p>Full access · 30-day refund</p>
+            </div>
+          </div>
+
+          <div class="sum-promo">
+            <input id="promo" type="text" placeholder="Promo code" />
+            <button id="applyPromo">Apply</button>
+          </div>
+          <div class="promo-msg" id="promoMsg"></div>
+
+          <div class="sum-line"><span>Subtotal</span><span class="v" id="subtotal">$45.00</span></div>
+          <div class="sum-line"><span>Discount</span><span class="v" id="discount">−$0.00</span></div>
+          <div class="sum-line"><span>Tax</span><span class="v" id="tax">$0.00</span></div>
+          <div class="sum-total"><span class="lbl">Total</span><span class="amt" id="total">$45.00</span></div>
+
+          <div class="pay-head">Pay securely</div>
+          <div id="paypal-button-container"></div>
+          <div class="pay-loading" id="payLoading">Loading secure payment…</div>
+
+          <div class="sum-trust">
+            <span><i class="fa-solid fa-lock"></i> 256-bit encrypted payment</span>
+            <span><i class="fa-solid fa-shield-halved"></i> 30-day money-back</span>
+            <span><i class="fa-solid fa-bolt"></i> Instant confirmation</span>
+            <span><i class="fa-solid fa-headset"></i> 24/7 customer support</span>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</main>
+
+<div class="done" id="done">
+  <div class="inner">
+    <div class="check"><i class="fa-solid fa-check"></i></div>
+    <h2>Payment successful!</h2>
+    <p>Thank you. Your order confirmation is on its way to your email — usually within a few minutes.</p>
+    <div class="oid">Order ID: <strong id="orderId">—</strong></div>
+    <br>
+    <a href="#" class="btn" onclick="location.reload();return false;">Done <i class="fa-solid fa-arrow-right"></i></a>
+  </div>
+</div>
+
+<footer class="footer-light">
+  <div class="container footer-light-bottom">
+    <div>© 2026 · Secure Checkout</div>
+    <div>Powered by PayPal</div>
+  </div>
+</footer>
+
+<script>
+/* ---- state ---- */
+let selected = 'premium';
+let promo = '';
+let quote = null;
+const $ = id => document.getElementById(id);
+
+const NAMES = {
+  starter:'Plan A — 1 Month',
+  quarterly:'Plan B — 3 Months',
+  premium:'Plan C — 6 Months',
+  ultra:'Plan D — 12 Months'
+};
+
+/* ---- optional ?plan= preselection ---- */
+(function preselect(){
+  const p = new URLSearchParams(location.search).get('plan');
+  if(p && NAMES[p]){
+    selected = p;
+    document.querySelectorAll('.plan-opt').forEach(el => el.classList.toggle('active', el.dataset.id===selected));
+    $('sumName').textContent = NAMES[selected];
+  }
+})();
+
+/* ---- plan switching ---- */
+document.querySelectorAll('.plan-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.plan-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    selected = opt.dataset.id;
+    $('sumName').textContent = NAMES[selected];
+    refresh();
+  });
+});
+
+function cart(){ return [{ id: selected, qty: 1 }]; }
+
+/* ---- clear invalid styling when user types ---- */
+['email','fname','lname','city'].forEach(id => {
+  $(id).addEventListener('input', () => $(id).classList.remove('invalid'));
+});
+
+/* ---- price refresh from server ---- */
+async function refresh(){
+  try{
+    const res = await fetch('/api/quote', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cart: cart(), promo })
+    });
+    quote = await res.json();
+    $('subtotal').textContent = '$' + quote.subtotal;
+    $('discount').textContent = '−$' + quote.discount;
+    $('tax').textContent      = '$' + quote.tax;
+    $('total').textContent    = '$' + quote.total;
+  }catch(e){
+    $('total').textContent = '—';
+  }
+}
+
+/* ---- promo ---- */
+$('applyPromo').onclick = async () => {
+  promo = $('promo').value.trim();
+  await refresh();
+  const msg = $('promoMsg');
+  if(promo && quote && parseFloat(quote.discount) > 0){ msg.textContent = promo.toUpperCase()+' applied!'; msg.className='promo-msg ok'; }
+  else if(promo){ msg.textContent = 'Invalid code'; msg.className='promo-msg err'; }
+  else { msg.textContent=''; }
+};
+
+/* ---- boot PayPal ---- */
+async function init(){
+  await refresh();
+  try{
+    const cfg = await (await fetch('/api/config')).json();
+    const s = document.createElement('script');
+    s.src = `https://www.paypal.com/sdk/js?client-id=${cfg.clientId}&currency=${cfg.currency}`;
+    s.onload = mountButtons;
+    s.onerror = () => { $('payLoading').textContent = 'Could not load PayPal — check your Client ID.'; };
+    document.head.appendChild(s);
+  }catch(e){
+    $('payLoading').textContent = 'Payment unavailable — is the server running?';
+  }
+}
+
+function mountButtons(){
+  $('payLoading').style.display = 'none';
+  paypal.Buttons({
+    style:{ layout:'vertical', color:'black', shape:'pill', label:'paypal' },
+
+    /* === VALIDATION: runs before PayPal popup opens === */
+    onClick: (data, actions) => {
+      // clear previous errors
+      ['email','fname','lname','city'].forEach(id => $(id).classList.remove('invalid'));
+      $('formError').style.display = 'none';
+
+      const email = $('email').value.trim();
+      const fname = $('fname').value.trim();
+      const lname = $('lname').value.trim();
+      const city  = $('city').value.trim();
+      const errors = [];
+
+      if(!fname){ $('fname').classList.add('invalid'); errors.push('first name'); }
+      if(!lname){ $('lname').classList.add('invalid'); errors.push('last name'); }
+      if(!email){ $('email').classList.add('invalid'); errors.push('email'); }
+      else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ $('email').classList.add('invalid'); errors.push('valid email'); }
+      if(!city){ $('city').classList.add('invalid'); errors.push('city'); }
+
+      if(errors.length){
+        $('formError').textContent = 'Please fill in: ' + errors.join(', ') + '.';
+        $('formError').style.display = 'block';
+        $('formError').scrollIntoView({behavior:'smooth', block:'center'});
+        return actions.reject();
+      }
+      return actions.resolve();
+    },
+
+    createOrder: () => fetch('/api/orders', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cart: cart(), promo })
+    }).then(r => r.json()).then(d => d.id),
+
+    /* === IMPORTANT: send customer info + cart so Telegram gets them === */
+    onApprove: (data) => {
+      const customer = {
+        email:   $('email').value.trim(),
+        fname:   $('fname').value.trim(),
+        lname:   $('lname').value.trim(),
+        country: $('country').value,
+        city:    $('city').value.trim()
+      };
+      return fetch(`/api/orders/${data.orderID}/capture`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ cart: cart(), promo, customer })
+      }).then(r => r.json()).then(details => {
+        if(details.status === 'COMPLETED'){
+          $('orderId').textContent = details.id;
+          $('done').classList.add('show');
+        } else { alert('Payment not completed. Please try again.'); }
+      });
+    },
+
+    onError: err => { alert('Something went wrong with PayPal.'); console.error(err); }
+  }).render('#paypal-button-container');
+}
+
+init();
+</script>
+</body>
+</html>
