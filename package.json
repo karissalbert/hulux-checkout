@@ -1,13 +1,17 @@
 {
-  "name": "bloom-cart-checkout",
+  "name": "checkout-auto-provision",
   "version": "1.0.0",
-  "description": "Bloom — secure server-side PayPal multi-item cart checkout",
+  "description": "Checkout with automatic IPTV provisioning (Postgres + panel API)",
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
