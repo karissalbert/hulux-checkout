@@ -207,24 +207,17 @@ async function panelRenew(username, password, months) {
   return { ok, raw: text };
 }
 
-/* Build the 3 server/M3U links (main, VPN, Smarters) from credentials.
-   Falls back to PANEL_SERVER_URL for the main one if SERVER_URL_MAIN isn't set.
+/* Build the display fields: 3 server URLs (main/vpn/smarters) + one full M3U (from main).
    Works for new AND renewal customers. */
 function buildServers(username, password) {
-  const mk = (label, base) => {
-    base = (base || '').replace(/\/+$/, '');
-    if (!base || !username || !password) return null;
-    return {
-      label,
-      server: base,
-      m3u: `${base}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`
-    };
-  };
-  return [
-    mk('Main', SERVER_URL_MAIN || PANEL_SERVER_URL),
-    mk('VPN', SERVER_URL_VPN),
-    mk('Smarters Pro', SERVER_URL_SMARTERS)
-  ].filter(Boolean);
+  const clean = u => (u || '').replace(/\/+$/, '');
+  const main = clean(SERVER_URL_MAIN || PANEL_SERVER_URL);
+  const vpn  = clean(SERVER_URL_VPN);
+  const smarters = clean(SERVER_URL_SMARTERS);
+  const m3u = (main && username && password)
+    ? `${main}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`
+    : '';
+  return { main, vpn, smarters, m3u };
 }
 
 /* Build the server URL + M3U URL from PANEL_SERVER_URL + credentials.
@@ -260,34 +253,31 @@ async function sendTelegram(text) {
 }
 
 /* ---- BREVO EMAIL ---- */
-async function sendCustomerEmail({ to, name, planName, username, password, expire, servers = [] }) {
+async function sendCustomerEmail({ to, name, planName, username, password, expire, servers = {} }) {
   if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) { console.warn('Brevo not configured — skipping email'); return false; }
   if (!to) { console.warn('No customer email — skipping email'); return false; }
 
-  // build a block for each server (Main / VPN / Smarters Pro)
-  const serverSections = servers.map(s => `
-    <div style="margin:14px 0;padding:14px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
-      <div style="font-weight:700;color:#15803d;margin-bottom:8px">${s.label}</div>
-      <div style="font-size:13px;color:#6b7280">Server URL</div>
-      <div style="font-family:monospace;color:#111;word-break:break-all;margin-bottom:8px">${s.server}</div>
-      <div style="font-size:13px;color:#6b7280">M3U URL</div>
-      <div style="font-family:monospace;word-break:break-all"><a href="${s.m3u}" style="color:#16a34a">${s.m3u}</a></div>
-    </div>`).join('');
+  const row = (label, value, isLink) => value
+    ? `<tr><td style="padding:9px 14px;color:#6b7280;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:9px 14px;font-family:monospace;color:#111;word-break:break-all">${isLink ? `<a href="${value}" style="color:#16a34a">${value}</a>` : value}</td></tr>`
+    : '';
 
   const html = `
-  <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
     <div style="background:#111;padding:24px;text-align:center">
       <span style="color:#22c55e;font-size:22px;font-weight:800">✓ Your subscription is ready</span>
     </div>
     <div style="padding:28px">
       <p style="font-size:16px;color:#111">Hi ${name || 'there'},</p>
-      <p style="font-size:15px;color:#374151;line-height:1.6">Thank you for your order. Your <strong>${planName}</strong> subscription is active. Here are your login details:</p>
-      <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:10px;padding:8px;margin:18px 0">
-        <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Username</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${username || '—'}</td></tr>
-        <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Password</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${password || '—'}</td></tr>
-        <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Expires</td><td style="padding:8px 14px 8px 0;color:#111">${expire || '—'}</td></tr>
+      <p style="font-size:15px;color:#374151;line-height:1.6">Thank you for your order. Your <strong>${planName}</strong> subscription is active. Here are your details:</p>
+      <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:10px;margin:18px 0">
+        ${row('Username', username)}
+        ${row('Password', password)}
+        ${row('Expiry date', expire)}
+        ${row('Main Server URL', servers.main)}
+        ${row('VPN URL', servers.vpn)}
+        ${row('Smarters Pro URL', servers.smarters)}
+        ${row('Full M3U URL', servers.m3u, true)}
       </table>
-      ${serverSections ? `<p style="font-size:14px;color:#374151;font-weight:600;margin:18px 0 4px">Your connection links:</p>${serverSections}` : ''}
       <div style="text-align:center;margin:26px 0">
         <a href="${SETUP_GUIDE_URL}" style="display:inline-block;background:#22c55e;color:#000;font-weight:700;text-decoration:none;padding:13px 26px;border-radius:10px">📘 View the Setup Guide</a>
       </div>
@@ -394,8 +384,8 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         console.error('Provisioning error:', err);
       }
 
-      // Build the 3 server/M3U links (main, VPN, Smarters) from the credentials
-      const servers = panelOk ? buildServers(creds.username, creds.password) : [];
+      // Build the server URLs + full M3U from the credentials
+      const servers = panelOk ? buildServers(creds.username, creds.password) : { main:'', vpn:'', smarters:'', m3u:'' };
 
       // Telegram
       const tag = isRenewal ? '🔄 <b>RENEWAL — line extended</b>' : '🆕 <b>NEW customer — line created</b>';
@@ -406,13 +396,11 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         '🔐 <b>Credentials</b>',
         `  • Username: <code>${creds.username || '—'}</code>`,
         `  • Password: <code>${creds.password || '—'}</code>`,
-        newExpire ? (isRenewal ? `  • Expire: ${oldExpire} → <b>${newExpire}</b>` : `  • Expire: <b>${newExpire}</b>`) : null,
-        ...(servers.length ? ['', '🌐 <b>Server / M3U links</b>'] : []),
-        ...servers.flatMap(s => [
-          `<b>${s.label}</b>`,
-          `  • Server: <code>${s.server}</code>`,
-          `  • M3U: <code>${s.m3u}</code>`
-        ]),
+        newExpire ? `  • Expiry date: <b>${newExpire}</b>${isRenewal && oldExpire ? ` (was ${oldExpire})` : ''}` : null,
+        servers.main ? `  • Main Server URL: <code>${servers.main}</code>` : null,
+        servers.vpn ? `  • VPN URL: <code>${servers.vpn}</code>` : null,
+        servers.smarters ? `  • Smarters Pro URL: <code>${servers.smarters}</code>` : null,
+        servers.m3u ? `  • Full M3U URL: <code>${servers.m3u}</code>` : null,
         '',
         '👤 <b>Customer</b>',
         `  • Name: ${name}`,
