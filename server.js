@@ -240,7 +240,8 @@ app.post('/api/orders/:id/capture', async (req, res) => {
           panelOk = rn.ok; panelRaw = rn.raw;
           creds = { username: existing.username, password: existing.password };
           oldExpire = existing.expire ? new Date(existing.expire).toISOString().slice(0,10) : null;
-          newExpire = await updateRenewal(email, oldExpire, months, data.id);
+          // only advance the stored expiry if the panel actually renewed
+          if (panelOk) newExpire = await updateRenewal(email, oldExpire, months, data.id);
         } else {
           // NEW
           const nw = await panelNew(months, notes);
