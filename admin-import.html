@@ -50,12 +50,12 @@
 
   <div class="card">
     <label for="data">Customer data (one per line)</label>
-    <textarea id="data" placeholder="email, username, password, expire&#10;karissalbert@gmail.com, 6f73b3b4bc, cedc00cc0b, 2026-06-28&#10;info@a1pianoremovals.com, e56ba719a87f, 1971648f01, 2026-06-20"></textarea>
+    <textarea id="data" placeholder="username  password  expire  email&#10;6f73b3b4bc  cedc00cc0b  2026-06-28  karissalbert@gmail.com&#10;e56ba719a87f  1971648f01  2026-06-20  info@a1pianoremovals.com"></textarea>
     <p class="hint">
-      Format per line: <code>email, username, password, expire</code><br>
-      Separators can be comma, tab, or semicolon. Expire is <code>YYYY-MM-DD</code> (optional).<br>
+      Format per line: <code>username  password  expire  email</code> (same order as your panel)<br>
+      Separators can be spaces, comma, tab, or semicolon. Expire is <code>YYYY-MM-DD</code> (optional).<br>
       Rows without an email are skipped (they can't be matched on renewal).<br>
-      A header line like <code>email, username, ...</code> is detected and ignored.
+      A header line containing <code>username</code> is detected and ignored.
     </p>
     <div class="row" style="margin-top:14px">
       <button id="previewBtn">Preview</button>
@@ -78,17 +78,16 @@ function parseData(text){
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const out = [];
   for (let i = 0; i < lines.length; i++){
-    // split on comma, tab, or semicolon
-    const parts = lines[i].split(/[,;\t]/).map(s => s.trim());
-    const email = (parts[0]||'').toLowerCase();
+    // split on comma, tab, semicolon, OR runs of 2+ spaces
+    const parts = lines[i].split(/[,;\t]+|\s{2,}/).map(s => s.trim()).filter(Boolean);
+    // expected order (matches your panel/PDF): username, password, expire, email
+    const username = parts[0] || '';
+    const password = parts[1] || '';
+    const expire   = parts[2] || '';
+    const email    = (parts[3] || '').toLowerCase();
     // skip a header row
-    if (i === 0 && (email === 'email' || email.includes('email'))) continue;
-    out.push({
-      email,
-      username: parts[1] || '',
-      password: parts[2] || '',
-      expire:   parts[3] || ''
-    });
+    if (i === 0 && lines[i].toLowerCase().includes('username')) continue;
+    out.push({ email, username, password, expire });
   }
   return out;
 }
