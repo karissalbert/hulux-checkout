@@ -243,6 +243,9 @@ async function sendCustomerEmail({ to, name, planName, username, password, expir
   } catch (e) { console.error('Brevo send failed:', e); return false; }
 }
 
+/* ---- API ---- */
+app.get('/api/config', (req, res) => res.json({ clientId: PAYPAL_CLIENT_ID, currency: CURRENCY }));
+
 app.post('/api/quote', (req, res) => {
   const q = priceCart((req.body||{}).cart, (req.body||{}).promo);
   res.json({ items:q.items, subtotal:money(q.subtotal), discount:money(q.discount), tax:money(q.tax), total:money(q.total) });
