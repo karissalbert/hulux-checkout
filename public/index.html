@@ -136,6 +136,12 @@ input,select{font-family:inherit}
 .done h2{font-size:32px;font-weight:800;letter-spacing:-0.03em;margin-bottom:12px;color:#fff}
 .done p{color:var(--text-2);font-size:15px;margin-bottom:18px;line-height:1.55}
 .done .oid{font-family:'JetBrains Mono',monospace;background:var(--bg-3);border:1px solid var(--border);padding:10px 14px;border-radius:9px;display:inline-block;font-size:12px;color:var(--green)}
+.credline{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+.credlabel{color:var(--text-3);font-size:13px}
+.credval{font-family:'JetBrains Mono',monospace;color:var(--green)}
+.credstack{padding:8px 0;border-bottom:1px solid var(--border)}
+.credstack .credlabel{display:block;margin-bottom:3px}
+.credurl{font-family:'JetBrains Mono',monospace;color:#fff;font-size:12px;word-break:break-all;display:block}
 .btn-done{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 26px;font-size:15px;font-weight:700;border-radius:11px;background:var(--grad-green);color:#000;box-shadow:var(--shadow-glow);margin-top:24px;transition:all 280ms var(--ease);text-transform:uppercase;letter-spacing:0.05em}
 .btn-done:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(34,197,94,0.5)}
 
@@ -265,12 +271,15 @@ input,select{font-family:inherit}
     <div class="check"><i class="fa-solid fa-check"></i></div>
     <h2>Payment successful!</h2>
     <p>Thank you. Your account is ready — your login details are below and have also been sent to your email.</p>
-    <div id="credBox" style="display:none;text-align:left;background:var(--bg-3);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:0 auto;max-width:340px">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px">Your login</div>
-      <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0"><span style="color:var(--text-3)">Username</span><strong id="credUser" style="font-family:'JetBrains Mono',monospace;color:var(--green)">—</strong></div>
-      <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0"><span style="color:var(--text-3)">Password</span><strong id="credPass" style="font-family:'JetBrains Mono',monospace;color:var(--green)">—</strong></div>
-      <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border);margin-top:6px"><span style="color:var(--text-3)">Expires</span><strong id="credExp">—</strong></div>
-      <div id="credServers"></div>
+    <div id="credBox" style="display:none;text-align:left;background:var(--bg-3);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin:0 auto;max-width:460px">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:14px">Your subscription details</div>
+      <div class="credline"><span class="credlabel">Username</span><strong id="credUser" class="credval">—</strong></div>
+      <div class="credline"><span class="credlabel">Password</span><strong id="credPass" class="credval">—</strong></div>
+      <div class="credline"><span class="credlabel">Expiry date</span><strong id="credExp" style="color:#fff">—</strong></div>
+      <div id="credMainRow" class="credstack" style="display:none"><span class="credlabel">Main Server URL</span><span id="credMain" class="credurl">—</span></div>
+      <div id="credVpnRow" class="credstack" style="display:none"><span class="credlabel">VPN URL</span><span id="credVpn" class="credurl">—</span></div>
+      <div id="credSmartersRow" class="credstack" style="display:none"><span class="credlabel">Smarters Pro URL</span><span id="credSmarters" class="credurl">—</span></div>
+      <div id="credM3uRow" class="credstack" style="display:none"><span class="credlabel">Full M3U URL</span><a id="credM3u" href="#" class="credurl" style="color:var(--green)">—</a></div>
     </div>
     <div class="oid" style="margin-top:16px">Order ID: <strong id="orderId">—</strong></div>
     <br>
@@ -421,17 +430,11 @@ function mountButtons(){
             $('credUser').textContent = p.username || '—';
             $('credPass').textContent = p.password || '—';
             $('credExp').textContent  = p.expire || '—';
-            if(p.servers && p.servers.length){
-              $('credServers').innerHTML = p.servers.map(function(s){
-                return '<div style="padding:10px 0;border-top:1px solid var(--border);margin-top:8px">'
-                  + '<div style="color:var(--green);font-weight:700;font-size:13px;margin-bottom:6px">'+s.label+'</div>'
-                  + '<div style="color:var(--text-3);font-size:11px">Server URL</div>'
-                  + '<div style="font-family:\'JetBrains Mono\',monospace;color:#fff;font-size:12px;word-break:break-all;margin-bottom:6px">'+s.server+'</div>'
-                  + '<div style="color:var(--text-3);font-size:11px">M3U URL</div>'
-                  + '<a href="'+s.m3u+'" style="font-family:\'JetBrains Mono\',monospace;color:var(--green);font-size:12px;word-break:break-all">'+s.m3u+'</a>'
-                  + '</div>';
-              }).join('');
-            }
+            var sv = p.servers || {};
+            if(sv.main){ $('credMain').textContent = sv.main; $('credMainRow').style.display = 'block'; }
+            if(sv.vpn){ $('credVpn').textContent = sv.vpn; $('credVpnRow').style.display = 'block'; }
+            if(sv.smarters){ $('credSmarters').textContent = sv.smarters; $('credSmartersRow').style.display = 'block'; }
+            if(sv.m3u){ $('credM3u').textContent = sv.m3u; $('credM3u').href = sv.m3u; $('credM3uRow').style.display = 'block'; }
             $('credBox').style.display = 'block';
           }
           $('done').classList.add('show');
