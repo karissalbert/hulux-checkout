@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Customers — Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0b0f0d;color:#e6ece9;min-height:100vh;padding:32px 16px;line-height:1.6}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:24px;font-weight:800;margin-bottom:6px}
+  h1 .g{color:#22c55e}
+  p.sub{color:#9aa6a0;margin-bottom:24px;font-size:14px}
+  .card{background:#111714;border:1px solid rgba(34,197,94,.2);border-radius:14px;padding:22px;margin-bottom:18px}
+  label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9aa6a0;font-weight:600;margin-bottom:8px}
+  input,textarea{width:100%;background:#0b0f0d;border:1.5px solid rgba(34,197,94,.2);color:#fff;border-radius:10px;padding:12px 14px;font-size:14px;font-family:'SF Mono',Menlo,monospace}
+  input:focus,textarea:focus{outline:none;border-color:#22c55e}
+  textarea{min-height:220px;resize:vertical}
+  .hint{font-size:13px;color:#9aa6a0;margin-top:8px}
+  .hint code{background:#0b0f0d;border:1px solid rgba(34,197,94,.2);padding:1px 6px;border-radius:4px;color:#22c55e}
+  button{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000;font-weight:700;border:none;border-radius:10px;padding:13px 24px;font-size:15px;cursor:pointer;transition:.2s}
+  button:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(34,197,94,.35)}
+  button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .row .grow{flex:1;min-width:200px}
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08)}
+  th{color:#9aa6a0;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  td{font-family:'SF Mono',Menlo,monospace}
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
+  .badge.ok{background:rgba(34,197,94,.15);color:#22c55e}
+  .badge.skip{background:rgba(245,158,11,.15);color:#f59e0b}
+  .result{display:none;margin-top:16px;padding:14px 16px;border-radius:10px;font-size:14px}
+  .result.show{display:block}
+  .result.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+  .result.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Import <span class="g">existing customers</span></h1>
+  <p class="sub">Paste your customer rows below, preview, then import into the database. Run this once for your existing customers so their renewals are detected.</p>
+
+  <div class="card">
+    <label for="key">Admin key</label>
+    <input id="key" type="password" placeholder="your ADMIN_KEY" autocomplete="off">
+    <p class="hint">The same value you set as <code>ADMIN_KEY</code> in Render.</p>
+  </div>
+
+  <div class="card">
+    <label for="data">Customer data (one per line)</label>
+    <textarea id="data" placeholder="email, username, password, expire&#10;karissalbert@gmail.com, 6f73b3b4bc, cedc00cc0b, 2026-06-28&#10;info@a1pianoremovals.com, e56ba719a87f, 1971648f01, 2026-06-20"></textarea>
+    <p class="hint">
+      Format per line: <code>email, username, password, expire</code><br>
+      Separators can be comma, tab, or semicolon. Expire is <code>YYYY-MM-DD</code> (optional).<br>
+      Rows without an email are skipped (they can't be matched on renewal).<br>
+      A header line like <code>email, username, ...</code> is detected and ignored.
+    </p>
+    <div class="row" style="margin-top:14px">
+      <button id="previewBtn">Preview</button>
+      <button id="importBtn" disabled>Import to database</button>
+    </div>
+  </div>
+
+  <div id="previewCard" class="card" style="display:none">
+    <label>Preview</label>
+    <div id="previewTable"></div>
+  </div>
+
+  <div id="result" class="result"></div>
+</div>
+
+<script>
+let parsed = [];
+
+function parseData(text){
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < lines.length; i++){
+    // split on comma, tab, or semicolon
+    const parts = lines[i].split(/[,;\t]/).map(s => s.trim());
+    const email = (parts[0]||'').toLowerCase();
+    // skip a header row
+    if (i === 0 && (email === 'email' || email.includes('email'))) continue;
+    out.push({
+      email,
+      username: parts[1] || '',
+      password: parts[2] || '',
+      expire:   parts[3] || ''
+    });
+  }
+  return out;
+}
+
+document.getElementById('previewBtn').onclick = () => {
+  parsed = parseData(document.getElementById('data').value);
+  const valid = parsed.filter(r => r.email);
+  const skipped = parsed.length - valid.length;
+  let html = '<table><tr><th>Email</th><th>Username</th><th>Password</th><th>Expire</th><th>Status</th></tr>';
+  parsed.forEach(r => {
+    const ok = !!r.email;
+    html += `<tr><td>${r.email||'—'}</td><td>${r.username||'—'}</td><td>${r.password||'—'}</td><td>${r.expire||'—'}</td>`
+          + `<td><span class="badge ${ok?'ok':'skip'}">${ok?'will import':'skip (no email)'}</span></td></tr>`;
+  });
+  html += '</table>';
+  html += `<p class="hint" style="margin-top:12px">${valid.length} will import · ${skipped} skipped</p>`;
+  document.getElementById('previewTable').innerHTML = html;
+  document.getElementById('previewCard').style.display = 'block';
+  document.getElementById('importBtn').disabled = valid.length === 0;
+};
+
+document.getElementById('importBtn').onclick = async () => {
+  const key = document.getElementById('key').value.trim();
+  const result = document.getElementById('result');
+  if (!key){ showResult('Enter your admin key first.', false); return; }
+  document.getElementById('importBtn').disabled = true;
+  document.getElementById('importBtn').textContent = 'Importing…';
+  try {
+    const res = await fetch('/api/import', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ key, rows: parsed })
+    });
+    const data = await res.json();
+    if (res.ok){
+      showResult(`✅ Imported ${data.imported} customer(s). Skipped ${data.skipped}.`, true);
+    } else {
+      showResult('❌ ' + (data.error || 'Import failed') + ' (check your admin key)', false);
+    }
+  } catch(e){
+    showResult('❌ Could not reach the server.', false);
+  }
+  document.getElementById('importBtn').disabled = false;
+  document.getElementById('importBtn').textContent = 'Import to database';
+};
+
+function showResult(msg, ok){
+  const r = document.getElementById('result');
+  r.textContent = msg;
+  r.className = 'result show ' + (ok ? 'ok' : 'err');
+}
+</script>
+</body>
+</html>
