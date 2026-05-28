@@ -32,6 +32,7 @@ const {
   PANEL_API_BASE,        // e.g. https://8k.cms-only.ru/api/api.php
   PANEL_API_KEY,         // your panel api_key
   PANEL_PACK = '35338',  // package id (same for all plans)
+  PANEL_SERVER_URL,      // e.g. http://your-server.com:8080  (used to build M3U + server URL)
   BREVO_API_KEY,                          // Brevo (Sendinblue) API key
   BREVO_SENDER_EMAIL,                     // your verified Brevo sender email
   BREVO_SENDER_NAME = 'Support',          // sender display name
@@ -160,6 +161,10 @@ async function panelNew(months, notes) {
     const base = server.replace(/\/+$/, '');
     m3u = `${base}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
   }
+  // DEBUG — logs the complete raw panel response so we can see the exact format
+  console.log('=== PANEL action=new RAW RESPONSE ===');
+  console.log(text);
+  console.log('=== END PANEL RESPONSE ===');
   return { username, password, m3u, server, raw };
 }
 
@@ -171,6 +176,15 @@ async function panelRenew(username, password, months) {
   let ok = res.ok;
   try { const j = JSON.parse(text); if (j.status === false || j.error) ok = false; } catch {}
   return { ok, raw: text };
+}
+
+/* Build the server URL + M3U URL from PANEL_SERVER_URL + credentials.
+   Works for new AND renewal customers (uses their username/password). */
+function buildUrls(username, password) {
+  const server = (PANEL_SERVER_URL || '').replace(/\/+$/, '');
+  if (!server || !username || !password) return { server: server || '', m3u: '' };
+  const m3u = `${server}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
+  return { server, m3u };
 }
 
 /* ---- PAYPAL ---- */
@@ -197,12 +211,15 @@ async function sendTelegram(text) {
 }
 
 /* ---- BREVO EMAIL ---- */
-async function sendCustomerEmail({ to, name, planName, username, password, expire, m3uUrl }) {
+async function sendCustomerEmail({ to, name, planName, username, password, expire, m3uUrl, serverUrl }) {
   if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) { console.warn('Brevo not configured — skipping email'); return false; }
   if (!to) { console.warn('No customer email — skipping email'); return false; }
 
+  const serverBlock = serverUrl
+    ? `<tr><td style="padding:8px 0 8px 14px;color:#6b7280">Server URL</td><td style="padding:8px 14px 8px 0;font-family:monospace;color:#111;word-break:break-all">${serverUrl}</td></tr>`
+    : '';
   const m3uBlock = m3uUrl
-    ? `<tr><td style="padding:8px 0;color:#6b7280">M3U URL</td><td style="padding:8px 0;font-family:monospace;color:#111;word-break:break-all"><a href="${m3uUrl}" style="color:#16a34a">${m3uUrl}</a></td></tr>`
+    ? `<tr><td style="padding:8px 0 8px 14px;color:#6b7280">M3U URL</td><td style="padding:8px 14px 8px 0;font-family:monospace;color:#111;word-break:break-all"><a href="${m3uUrl}" style="color:#16a34a">${m3uUrl}</a></td></tr>`
     : '';
 
   const html = `
@@ -217,7 +234,8 @@ async function sendCustomerEmail({ to, name, planName, username, password, expir
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Username</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${username || '—'}</td></tr>
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Password</td><td style="padding:8px 14px 8px 0;font-family:monospace;font-weight:700;color:#111">${password || '—'}</td></tr>
         <tr><td style="padding:8px 0 8px 14px;color:#6b7280">Expires</td><td style="padding:8px 14px 8px 0;color:#111">${expire || '—'}</td></tr>
-        ${m3uBlock ? m3uBlock.replace('padding:8px 0','padding:8px 0 8px 14px') : ''}
+        ${serverBlock}
+        ${m3uBlock}
       </table>
       <div style="text-align:center;margin:26px 0">
         <a href="${SETUP_GUIDE_URL}" style="display:inline-block;background:#22c55e;color:#000;font-weight:700;text-decoration:none;padding:13px 26px;border-radius:10px">📘 View the Setup Guide</a>
@@ -292,7 +310,7 @@ app.post('/api/orders/:id/capture', async (req, res) => {
       const name = `${customer.fname||''} ${customer.lname||''}`.trim() || '—';
       const notes = `${email} order ${data.id}`;
 
-      let creds = { username:'', password:'' }, isRenewal = false, oldExpire = null, newExpire = null, panelOk = true, panelRaw = '', m3uUrl = '';
+      let creds = { username:'', password:'' }, isRenewal = false, oldExpire = null, newExpire = null, panelOk = true, panelRaw = '', m3uUrl = '', serverUrl = '';
 
       try {
         const existing = await findCustomer(email);
@@ -302,17 +320,23 @@ app.post('/api/orders/:id/capture', async (req, res) => {
           const rn = await panelRenew(existing.username, existing.password, months);
           panelOk = rn.ok; panelRaw = rn.raw;
           creds = { username: existing.username, password: existing.password };
-          m3uUrl = existing.m3u || '';
           oldExpire = existing.expire ? new Date(existing.expire).toISOString().slice(0,10) : null;
+          // build URLs from the configured server + their credentials (fall back to stored m3u)
+          const built = buildUrls(creds.username, creds.password);
+          serverUrl = built.server;
+          m3uUrl = existing.m3u || built.m3u;
           // only advance the stored expiry if the panel actually renewed
           if (panelOk) newExpire = await updateRenewal(email, oldExpire, months, data.id);
         } else {
           // NEW
           const nw = await panelNew(months, notes);
           creds = { username: nw.username, password: nw.password };
-          m3uUrl = nw.m3u || '';
           panelRaw = typeof nw.raw === 'string' ? nw.raw : JSON.stringify(nw.raw);
           panelOk = !!(creds.username && creds.password);
+          // prefer the panel-provided m3u; otherwise build from configured server
+          const built = buildUrls(creds.username, creds.password);
+          serverUrl = nw.server || built.server;
+          m3uUrl = nw.m3u || built.m3u;
           if (panelOk) newExpire = await upsertNew(email, creds.username, creds.password, months, data.id, m3uUrl);
         }
       } catch (err) {
@@ -329,6 +353,7 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         '🔐 <b>Credentials</b>',
         `  • Username: <code>${creds.username || '—'}</code>`,
         `  • Password: <code>${creds.password || '—'}</code>`,
+        serverUrl ? `  • Server: <code>${serverUrl}</code>` : null,
         m3uUrl ? `  • M3U: <code>${m3uUrl}</code>` : null,
         newExpire ? (isRenewal ? `  • Expire: ${oldExpire} → <b>${newExpire}</b>` : `  • Expire: <b>${newExpire}</b>`) : null,
         '',
@@ -348,13 +373,13 @@ app.post('/api/orders/:id/capture', async (req, res) => {
         emailed = await sendCustomerEmail({
           to: email, name, planName,
           username: creds.username, password: creds.password,
-          expire: newExpire, m3uUrl
+          expire: newExpire, m3uUrl, serverUrl
         });
       }
 
       // hand the credentials back to the page (only if panel succeeded)
       data._provision = panelOk
-        ? { ok:true, isRenewal, username:creds.username, password:creds.password, expire:newExpire, m3u:m3uUrl, emailed }
+        ? { ok:true, isRenewal, username:creds.username, password:creds.password, expire:newExpire, m3u:m3uUrl, server:serverUrl, emailed }
         : { ok:false };
     }
     res.status(r.status).json(data);
@@ -408,6 +433,34 @@ app.get('/admin/import', (req, res) => {
 app.get('/api/test-telegram', async (req, res) => {
   await sendTelegram('✅ Test message — Telegram is working!');
   res.json({ sent:true, hasToken:!!TELEGRAM_BOT_TOKEN, hasChatId:!!TELEGRAM_CHAT_ID });
+});
+
+/* ---- DIAGNOSTIC: shows which features are configured (admin-protected) ---- */
+app.get('/api/diag', (req, res) => {
+  if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.status(403).json({ error:'Forbidden' });
+  res.json({
+    paypal:   { clientId: !!PAYPAL_CLIENT_ID, secret: !!PAYPAL_SECRET, env: PAYPAL_ENV },
+    telegram: { token: !!TELEGRAM_BOT_TOKEN, chatId: !!TELEGRAM_CHAT_ID },
+    database: !!DATABASE_URL,
+    panel:    { base: PANEL_API_BASE || null, key: !!PANEL_API_KEY, pack: PANEL_PACK },
+    brevo:    { key: !!BREVO_API_KEY, sender: BREVO_SENDER_EMAIL || null },
+    setupUrl: SETUP_GUIDE_URL
+  });
+});
+
+/* ---- DIAGNOSTIC: calls the panel new API and returns the RAW response (admin-protected) ----
+   Visit: /api/test-panel?key=YOUR_ADMIN_KEY   (creates a 1-month test line)  */
+app.get('/api/test-panel', async (req, res) => {
+  if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.status(403).json({ error:'Forbidden' });
+  if (!PANEL_API_BASE || !PANEL_API_KEY) return res.json({ error:'PANEL_API_BASE / PANEL_API_KEY not set' });
+  const url = `${PANEL_API_BASE}?action=new&type=m3u&sub=1&pack=${PANEL_PACK}&country=ALL&notes=diagnostic-test&api_key=${PANEL_API_KEY}`;
+  try {
+    const r = await fetch(url);
+    const text = await r.text();
+    res.json({ status: r.status, rawResponse: text });
+  } catch (e) {
+    res.json({ error: String(e) });
+  }
 });
 
 app.listen(PORT, async () => {
