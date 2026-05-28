@@ -111,26 +111,37 @@ document.getElementById('previewBtn').onclick = () => {
 
 document.getElementById('importBtn').onclick = async () => {
   const key = document.getElementById('key').value.trim();
-  const result = document.getElementById('result');
   if (!key){ showResult('Enter your admin key first.', false); return; }
-  document.getElementById('importBtn').disabled = true;
-  document.getElementById('importBtn').textContent = 'Importing…';
+
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true;
+
+  const BATCH = 200;                     // rows per request
+  let totalImported = 0, totalSkipped = 0;
+
   try {
-    const res = await fetch('/api/import', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ key, rows: parsed })
-    });
-    const data = await res.json();
-    if (res.ok){
-      showResult(`✅ Imported ${data.imported} customer(s). Skipped ${data.skipped}.`, true);
-    } else {
-      showResult('❌ ' + (data.error || 'Import failed') + ' (check your admin key)', false);
+    for (let i = 0; i < parsed.length; i += BATCH) {
+      const chunk = parsed.slice(i, i + BATCH);
+      btn.textContent = `Importing… ${Math.min(i + BATCH, parsed.length)}/${parsed.length}`;
+      const res = await fetch('/api/import', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key, rows: chunk })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showResult('❌ ' + (data.error || 'Import failed') + ' (check your admin key)', false);
+        btn.disabled = false; btn.textContent = 'Import to database';
+        return;
+      }
+      totalImported += data.imported || 0;
+      totalSkipped  += data.skipped  || 0;
     }
+    showResult(`✅ Imported ${totalImported} customer(s). Skipped ${totalSkipped}.`, true);
   } catch(e){
     showResult('❌ Could not reach the server.', false);
   }
-  document.getElementById('importBtn').disabled = false;
-  document.getElementById('importBtn').textContent = 'Import to database';
+  btn.disabled = false;
+  btn.textContent = 'Import to database';
 };
 
 function showResult(msg, ok){
